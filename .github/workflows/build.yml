@@ -1,0 +1,75 @@
+name: Build Kairos
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "cloud-config.yaml"
+      - ".github/workflows/build.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Prepare Secure Configuration
+    runs-on: ubuntu-latest
+
+    outputs:
+      config-name: cloud-config.yaml
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Inject password securely
+        env:
+          KAIROS_PASSWORD: ${{ secrets.KAIROS_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$KAIROS_PASSWORD" ]; then
+            echo "ERROR: KAIROS_PASSWORD secret is missing"
+            exit 1
+          fi
+
+          cp cloud-config.yaml cloud-config.generated.yaml
+
+          sed -i \
+            "s|\${KAIROS_PASSWORD}|${KAIROS_PASSWORD}|g" \
+            cloud-config.generated.yaml
+
+      - name: Upload secure configuration
+        uses: actions/upload-artifact@v4
+        with:
+          name: kairos-config
+          path: cloud-config.generated.yaml
+          retention-days: 1
+
+  build:
+    name: Build Kairos ARM64
+    needs: prepare
+
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@main
+
+    with:
+      version: "auto"
+
+      base_image: "ubuntu:24.04"
+
+      model: "generic"
+
+      arch: "arm64"
+
+      kubernetes_distro: "k3s"
+
+      iso: true
+
+      cloud_config: "cloud-config.generated.yaml"
+
+      compute_checksums: true
+
+      summary_artifacts: true
