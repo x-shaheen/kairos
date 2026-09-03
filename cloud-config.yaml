@@ -1,0 +1,19 @@
+#cloud-config
+
+hostname: kairos-cloud
+
+users:
+  - name: kairos
+    passwd: "${KAIROS_PASSWORD}"
+    lock_passwd: false
+    groups:
+      - admin
+
+install:
+  auto: true
+  device: "/dev/sda"
+  reboot: true
+  poweroff: false
+
+k3s:
+  enabled: true
